@@ -1,0 +1,56 @@
+name: Build Android ARM64 Binary
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Build with runner NDK
+        run: |
+          export ANDROID_NDK_HOME=$(ls -d /usr/local/lib/android/sdk/ndk/* | head -n 1)
+          export ANDROID_NDK_ROOT=$ANDROID_NDK_HOME
+          echo "Found Android NDK at: $ANDROID_NDK_HOME"
+          cargo ndk --target arm64-v8a --platform 30 build --release
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: injector_updater
+          path: target/aarch64-linux-android/release/injector_updater
